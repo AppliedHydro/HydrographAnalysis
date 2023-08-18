@@ -44,16 +44,27 @@ mo_stats<- function(site){
   
   monthly_q$min<- q%>% group_by(mo) %>%
     summarize(min = min(Flow, na.rm=TRUE)) %>% dplyr::select(min)
-
-  #plot(monthly_q$mo, monthly_q$avg, type= 'l', col="blue")
-  #lines(monthly_q$mo, monthly_q$avg, col="black")
-  #lot(monthly_q$mo, monthly_q$min$min, type='l', col="red")
-  p<- ggplot(monthly_q, aes(mo, min$min), color='r') + 
-    geom_line() +
-    theme_bw() 
   
-  return(p)
+  # need to seperate this better
+  annual_flows <- q%>% group_by(wy) %>%
+    summarize(min = min(Flow, na.rm=TRUE))
+  
+  return(list(monthly_q, annual_flows))
 }
 
 johnson_stats<-mo_stats(johnson)
+ggplot(johnson_stats[[1]], aes(mo, min$min), color='r') + 
+  geom_line() +
+  theme_bw() +
+  ylab("Johnson Creek Min Monthly Streamflow (cfs)")
+
 efsf_stats<-mo_stats(efsf)
+ggplot(efsf_stats[[1]], aes(mo, min$min), color='r') + 
+  geom_line() +
+  theme_bw() +
+  ylab("Johnson Creek Min Monthly Streamflow (cfs)")
+
+ggplot(efsf_stats[[2]], aes(wy, min), color='r') + 
+  geom_point() +
+  theme_bw() +
+  ylab("Johnson Creek Min Monthly Streamflow (cfs)")
