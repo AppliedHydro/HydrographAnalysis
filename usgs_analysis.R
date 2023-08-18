@@ -67,4 +67,4 @@ ggplot(efsf_stats[[1]], aes(mo, min$min), color='r') +
 ggplot(efsf_stats[[2]], aes(wy, min), color='r') + 
   geom_point() +
   theme_bw() +
-  ylab("Johnson Creek Min Monthly Streamflow (cfs)")
+  ylab("EFSF above Sugar Annual Minimum Streamflow (cfs)")
