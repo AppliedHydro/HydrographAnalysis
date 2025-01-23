@@ -16,8 +16,10 @@ library(smwrBase) # waterYear
 johnson = 13313000
 efsf = 13311250
 sugar = 13311450
+sfs = 13310700
 
-usgs_sites = c(johnson, efsf, sugar)#  put all sites in one vector
+
+usgs_sites = c(johnson, efsf, sugar, sfs)#  put all sites in one vector
 
 pCode = "00060" # USGS code for streamflow
 site_info<- whatNWISdata(sites= usgs_sites, parameterCd = pCode, outputDataTypeCd ='uv') 
@@ -32,26 +34,44 @@ streamflow_data$mo <- month(streamflow_data$Date)
 streamflow_data$wy <- as.numeric(as.character(waterYear(streamflow_data$Date, numeric=TRUE)))
 streamflow_data$day <- day(streamflow_data$Date)
 streamflow_data$site_no <- as.numeric(streamflow_data$site_no)
+streamflow_data$doy<- yday(streamflow_data$Date)
+streamflow_data$plot_date <- as.Date(paste0(2020, "-", streamflow_data$mo, "-", streamflow_data$day))
 
-mo_stats<- function(site){
-  q<- streamflow_data %>% filter(site_no == site)
+day_stats1<- function(site, wy_start, wy_end){
+  q<- streamflow_data %>% filter(site_no == site) %>% filter(wy >= wy_start & wy <= wy_end)
   
-  monthly_q<- q %>% group_by(mo) %>%
+  monthly_q<- q %>% group_by(doy) %>%
     summarize(avg = mean(Flow, na.rm=TRUE))
 
-  monthly_q$max<- q %>% group_by(mo) %>%
+  monthly_q$max<- q %>% group_by(doy) %>%
     summarize(max = max(Flow, na.rm=TRUE)) %>% dplyr::select(max) 
   
-  monthly_q$min<- q%>% group_by(mo) %>%
+  monthly_q$min<- q%>% group_by(doy) %>%
     summarize(min = min(Flow, na.rm=TRUE)) %>% dplyr::select(min)
   
-  # need to seperate this better
+  monthly_q$med<- q%>% group_by(doy) %>%
+    summarize(med = median(Flow, na.rm=TRUE)) %>% dplyr::select(med)
+  
+  # need to separate this better
   annual_flows <- q%>% group_by(wy) %>%
     summarize(min = min(Flow, na.rm=TRUE))
   
   quantiles <- quantile(q$Flow, probs =c(0.05, 0.25, 0.5, 0.75, 0.95), na.rm=TRUE) %>% round(1)
 
   return(list(monthly_q, annual_flows, quantiles))
+}
+
+day_stats<-function(site, wy_start, wy_end){
+  q<- streamflow_data %>% filter(site_no == site) %>% filter(wy >= wy_start & wy <= wy_end)
+ 
+   q %>% group_by(doy) %>%
+    summarize(
+      avg= mean(Flow, na.rm=TRUE),
+      median = median(Flow, na.rm = TRUE),
+      max = max(Flow, na.rm = TRUE),
+      min = min(Flow, na.rm = TRUE),
+      .groups = "drop"
+    )
 }
 
 johnson_stats<-mo_stats(johnson)
@@ -64,7 +84,6 @@ ggplot(johnson_stats[[2]], aes(wy, min), color='r') +
   geom_point() +
   theme_bw() +
   ylab("Johnson Creek Annual Minimum Streamflow (cfs)")
-
 
 efsf_stats<-mo_stats(efsf)
 ggplot(efsf_stats[[1]], aes(mo, min$min), color='r') + 
@@ -82,12 +101,63 @@ ggplot(efsf_stats[[1]], aes(mo, avg), color='r') +
   theme_bw() +
   ylab("EFSF Avg Monthly Streamflow (cfs)")
 
-
-
 ggplot(efsf_stats[[2]], aes(wy, min), color='r') + 
   geom_point() +
   theme_bw() +
   ylab("EFSF above Sugar Annual Minimum Streamflow (cfs)")
+
+
+sfs_stats<-day_stats(sfs, 1989, 2024) %>% mutate(date = as.Date(doy - 1, origin = "2020-01-01"))
+sfs_stats1<- day_stats(sfs, 1989, 1999) %>% mutate(date = as.Date(doy - 1, origin = "2020-01-01"))
+sfs_stats2<- day_stats(sfs, 2000, 2010) %>% mutate(date = as.Date(doy - 1, origin = "2020-01-01"))
+sfs_stats3<- day_stats(sfs, 2011, 2024) %>% mutate(date = as.Date(doy - 1, origin = "2020-01-01"))
+
+colors<- c("1989-1999" = "black", "2000-2010" = "aquamarine4", "2011-2024"="blue")
+ggplot() + 
+  geom_line(data= sfs_stats1, aes(date, avg, color = "1989-1999")) +
+  geom_line(data= sfs_stats2, aes(date, avg, color = "2000-2010")) +
+  geom_line(data= sfs_stats3, aes(date, avg, color = "2011-2024")) +
+  theme_bw() +
+  scale_x_date(date_breaks = "month", date_labels = "%b")+
+  theme(legend.position = c(0.75, 0.75), legend.text = element_text(size=8),legend.title = element_text(size=8)) +
+  labs(x= "Day of Year", y="SFS @ Krassel Avg Daily Streamflow (cfs)", color= "Timeframe")
+  
+
+ggplot() + 
+  geom_line(data= sfs_stats1, aes(date, max, color = "1989-1999")) +
+  #geom_line(data= sfs_stats2, aes(date, max, color = "2000-2010")) +
+  geom_line(data= sfs_stats3, aes(date, max, color = "2011-2024")) +
+  theme_bw() +
+  scale_x_date(date_breaks = "month", date_labels = "%b")+
+  theme(legend.position = c(0.75, 0.75), legend.text = element_text(size=8),legend.title = element_text(size=8)) +
+  labs(x= "Day of Year", y="SFS @ Krassel Max Daily Streamflow (cfs)", color= "Timeframe")
+
+ggplot() + 
+  geom_line(data= sfs_stats1[[1]], aes(doy, med$med), color='black') +
+  geom_line(data= sfs_stats2[[1]], aes(doy, med$med), color='aquamarine4') +
+  geom_line(data= sfs_stats3[[1]], aes(doy, med$med), color='blue') +
+  theme_bw() +
+  ylab("SFS Median Daily Streamflow (cfs)")
+
+ggplot() + 
+  geom_line(data= sfs_stats, aes(date, max), color='black') +
+  theme_bw() +
+  ylab("SFS Avg Daily Streamflow (cfs)")
+
+#seq dates starting with the beginning of water year
+flow_sfs <- streamflow_data %>% filter(site_no == sfs) %>% mutate(wyF=factor(wy)) %>%
+  mutate(plot_date=as.Date(paste0(2020, "-", mo, "-", day)))
+
+
+ggplot() +
+  geom_line(data=flow_sfs, aes(x = plot_date, y = Flow, group = wyF), lwd = 0.5, color='lightgrey')+
+  ylab("SFS @ Krassel Streamflow (cfs)")+
+  xlab("Day of Year")+
+  scale_x_date(date_labels = "%b")+
+  theme_bw()
+
+
+
 
 
 flow<- streamflow_data %>% filter(Date >= '2011-09-15' & Date <= '2022-1-15')
@@ -124,24 +194,9 @@ ggplot(sugar_stats[[1]], aes(mo, avg), color='r') +
   theme_bw() +
   ylab("Sugar Creek Monthyl Max Streamflow (cfs)")
 
-plot(sugar_stats[[1]])
 
 plot(flow$Date[flow$site_no == efsf], flow$Flow[flow$site_no == efsf], type='l')
 lines(flow$Date[flow$site_no == sugar], flow$Flow[flow$site_no == sugar], col='blue')
 
-total<-merge(ec, sug, by ='Date')
-total$q<- total$Flow.x+total$Flow.y
-total$efp<- total$Flow.x/total$q
-  
-plot(total$efp, type='l')
-curtailment =0.8
-for (i in 1:length(total$q)){
-  if (total$q[i] <= 25){
-    total$div[i] <- total$q[i]*curtailment
-   } else if (total$q[i] >= 25){
-   total$div[i] <- 9.6 }
-}
-
-total$ef_remaining= total$Flow.x - total$div
 
 
